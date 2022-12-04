@@ -10,9 +10,12 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -65,7 +68,7 @@ public class Bootstrap {
     private static final String FONT_PATH_KOLLEKTIFITALIC = "fonts/Kollektif-Italic.ttf";
     private static final String FONT_PATH_MINECRAFTIA = "fonts/Minecraftia-Regular.ttf";
 
-    static SplashScreen splash = new SplashScreen("Astrauworld updater", Swinger.getResourceIgnorePath("/splash.png"));
+    static SplashScreen splash = new SplashScreen("Astrauworld Launcher", Swinger.getResourceIgnorePath("/splash.png"));
     static JPanel panel = splash.getContentPane();
     static BufferedImage loadingImage = Swinger.getResourceIgnorePath("/loading.gif");
     static ImageIcon loadingIcon = new ImageIcon(Swinger.getResourceIgnorePath("/loading.gif"));
@@ -192,13 +195,8 @@ public class Bootstrap {
         fw.close();
     }
 
-    static void downloadJava() {
-
-    }
-
     static String getJarLink() {
-        String url = "https://github.com/AstrauworldMC/launcher/releases/download/" + newSaver.get("launcherVersion") + "/launcher.jar";
-        return url;
+        return "https://github.com/AstrauworldMC/launcher/releases/download/" + newSaver.get("launcherVersion") + "/launcher.jar";
     }
 
     static void setPropertiesFile() {
@@ -206,7 +204,7 @@ public class Bootstrap {
 
         try {
         newPropertiesFile.createNewFile();
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
 
 
         try {
@@ -219,7 +217,7 @@ public class Bootstrap {
             try {
                 currentPropertiesFile.createNewFile();
                 System.out.println("created");
-            } catch (IOException e) {}
+            } catch (IOException ignored) {}
             try {
                 copyFile(newPropertiesFile, currentPropertiesFile);
                 System.out.println("copied?");
@@ -236,14 +234,22 @@ public class Bootstrap {
         try {
             launcherJarFile.createNewFile();
             System.out.println("jar created");
-        } catch (IOException e) {}
+        } catch (IOException ignored) {}
 
-        if (currentSaver.get("launcherVersion") != newSaver.get("launcherVersion")) {
+        if (!Objects.equals(currentSaver.get("launcherVersion"), newSaver.get("launcherVersion"))) {
+            System.out.println(currentSaver.get("launcherVersion"));
+            System.out.println(newSaver.get("launcherVersion"));
             System.out.println("pas egal");
             infosLabel.setText("T\u00e9l\u00e9chargement de la derni\u00e8re version...");
             try {
                 downloadFromInternet(getJarLink(), launcherJarFile);
                 System.out.println("jar downloaded?");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            try {
+                copyFile(newPropertiesFile, currentPropertiesFile);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -254,6 +260,8 @@ public class Bootstrap {
     }
 
     static void update() {
+        astrauworldFolder.mkdir();
+
         setPropertiesFile();
 
         updateJar();
@@ -266,7 +274,17 @@ public class Bootstrap {
             System.out.println("Java 17 détecté");
             infosLabel.setText("Java 17 d\u00e9tect\u00e9");
         } else {
-            downloadJava();
+            Thread t = new Thread(() -> {
+                try {
+                    Desktop.getDesktop().browse(new URI("https://github.com/AstrauworldMC/launcher/wiki/Mise-en-place-de-Java-17"));
+                    System.exit(0);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            PopUpMessages.normalMessage("Java 17 non d\u00e9tect\u00e9", "Vous avez besoin de  Java 17, cliquez OK", t);
         }
 
     }
@@ -300,9 +318,9 @@ public class Bootstrap {
         }); // TODO réussir à ajouter un loading qui marche mdrr
     //    t.start();
 
-        infosLabel.setBounds(34, 375, 278, 16);
+        infosLabel.setBounds(34, 375, 278, 20);
         infosLabel.setForeground(Color.WHITE);
-        infosLabel.setFont(kollektifFont.deriveFont(18f));
+        infosLabel.setFont(kollektifFont.deriveFont(16f));
         splash.add(infosLabel);
 
         splash.display();
