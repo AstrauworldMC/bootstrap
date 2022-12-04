@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+}
+
+group 'fr.timeto.astrauworld'
+version '1.0.0'
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://litarvan.github.io/maven'
+    }
+    maven {
+        url 'https://maven.idrsolutions.com'
+        name 'IDR Solutions'
+    }
+    maven {
+        url 'https://jitpack.io'
+        name 'Jitpack'
+    }
+}
+
+dependencies {
+    implementation 'fr.flowarg:openlauncherlib:3.2.5'
+    implementation 'org.json:json:20220924'
+    implementation 'com.github.Litarvan:Swinger:master-SNAPSHOT'
+}
