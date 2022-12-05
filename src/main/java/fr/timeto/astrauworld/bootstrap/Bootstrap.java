@@ -1,5 +1,6 @@
 package fr.timeto.astrauworld.bootstrap;
 
+import fr.theshark34.openlauncherlib.LaunchException;
 import fr.theshark34.openlauncherlib.util.Saver;
 import fr.theshark34.swinger.Swinger;
 import fr.theshark34.openlauncherlib.util.SplashScreen;
@@ -13,6 +14,7 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
@@ -164,7 +166,7 @@ public class Bootstrap {
     static void downloadFromInternet(String fileUrl, File dest) throws IOException {
         URL url = new URL(fileUrl);
         InputStream is = url.openStream();
-        OutputStream os = new FileOutputStream(dest);
+        OutputStream os = Files.newOutputStream(dest.toPath());
 
         byte[] b = new byte[2048];
         int length;
@@ -278,15 +280,26 @@ public class Bootstrap {
                 try {
                     Desktop.getDesktop().browse(new URI("https://github.com/AstrauworldMC/launcher/wiki/Mise-en-place-de-Java-17"));
                     System.exit(0);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } catch (URISyntaxException e) {
+                } catch (IOException | URISyntaxException e) {
                     throw new RuntimeException(e);
                 }
             });
             PopUpMessages.normalMessage("Java 17 non d\u00e9tect\u00e9", "Vous avez besoin de  Java 17, cliquez OK", t);
         }
 
+    }
+
+    static void launch() throws LaunchException, IOException {
+        String [] parts = System.getenv("JAVA_HOME").split( ";" );
+        String cmd = "\"" + parts[0] + separatorChar + "bin" + separatorChar + "java" + "\" -cp \"" + launcherJar + "\" fr.timeto.astrauworld.launcher.LauncherFrame";
+
+        System.out.println("Commande: " + cmd);
+
+        Runtime rt = Runtime.getRuntime();
+
+        Process pr = rt.exec(cmd);
+
+        System.exit(0);
     }
 
     public static void main(String[] args) {
@@ -326,6 +339,14 @@ public class Bootstrap {
         splash.display();
 
         update();
+
+        try {
+            infosLabel.setText("Lancement...");
+            launch();
+        } catch (LaunchException | IOException e) {
+            PopUpMessages.errorMessage("Erreur", "Erreur au lancement  du launcher");
+            throw new RuntimeException(e);
+        }
 
     }
 }
