@@ -13,62 +13,18 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.regex.Pattern;
 
 import static java.lang.Thread.sleep;
+import static fr.timeto.timutilslib.PopUpMessages.*;
+import static fr.timeto.timutilslib.CustomFonts.*;
+import static fr.timeto.timutilslib.TimFilesUtils.*;
 
 public class Bootstrap {
-
-    private static InputStream getFileFromResourceAsStream(String fileName) {
-
-        // The class loader that loaded the class
-        ClassLoader classLoader = Bootstrap.class.getClassLoader();
-        InputStream inputStream = classLoader.getResourceAsStream(fileName);
-
-        // the stream holding the file content
-        if (inputStream == null) {
-            throw new IllegalArgumentException("file not found! " + fileName);
-        } else {
-            return inputStream;
-        }
-
-    }
-
-    public static Font CustomFont(String path) {
-        Font customFont = loadFont(path, 24f);
-        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        ge.registerFont(customFont);
-        return customFont;
-
-    }
-    public static Font loadFont(String path, float size){
-        try {
-            Font myFont = Font.createFont(Font.TRUETYPE_FONT, getFileFromResourceAsStream(path));
-            return myFont.deriveFont(Font.PLAIN, size);
-        } catch (FontFormatException | IOException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-        return null;
-    }
-
-    public static Font kollektifFont;
-    public static Font kollektifBoldFont;
-    public static Font kollektifBoldItalicFont;
-    public static Font kollektifItalicFont;
-    public static Font minecraftiaFont;
-    private static final String FONT_PATH_KOLLEKTIF = "fonts/Kollektif.ttf";
-    private static final String FONT_PATH_KOLLEKTIFBOLD = "fonts/Kollektif-Bold.ttf";
-    private static final String FONT_PATH_KOLLEKTIFBOLDITALIC = "fonts/Kollektif-BoldItalic.ttf";
-    private static final String FONT_PATH_KOLLEKTIFITALIC = "fonts/Kollektif-Italic.ttf";
-    private static final String FONT_PATH_MINECRAFTIA = "fonts/Minecraftia-Regular.ttf";
 
     static SplashScreen splash = new SplashScreen("Astrauworld Launcher", Swinger.getResourceIgnorePath("/splash.png"));
     static JPanel panel = splash.getContentPane();
@@ -97,15 +53,7 @@ public class Bootstrap {
 
     static JLabel infosLabel = new JLabel("V\u00e9rification de test", SwingConstants.CENTER);
 
-    public static void initFonts() {
-        kollektifFont = CustomFont(FONT_PATH_KOLLEKTIF);
-        kollektifBoldFont = CustomFont(FONT_PATH_KOLLEKTIFBOLD);
-        kollektifBoldItalicFont = CustomFont(FONT_PATH_KOLLEKTIFBOLDITALIC);
-        kollektifItalicFont = CustomFont(FONT_PATH_KOLLEKTIFITALIC);
-        minecraftiaFont = CustomFont(FONT_PATH_MINECRAFTIA);
-
-    }
-
+    @SuppressWarnings("all")
     static BufferedImage rotatingImage(BufferedImage image, int rad) {
 
 
@@ -124,77 +72,6 @@ public class Bootstrap {
 
         return rotatedImage;
 
-    }
-
-    private static void unzip(String zipFilePath, String destDir) {
-        File dir = new File(destDir);
-        // create output directory if it doesn't exist
-        if(!dir.exists()) dir.mkdirs();
-        FileInputStream fis;
-        //buffer for read and write data to file
-        byte[] buffer = new byte[1024];
-        try {
-            fis = new FileInputStream(zipFilePath);
-            ZipInputStream zis = new ZipInputStream(fis);
-            ZipEntry ze = zis.getNextEntry();
-            while(ze != null){
-                String fileName = ze.getName();
-                File newFile = new File(destDir + File.separator + fileName);
-                System.out.println("Unzipping to "+newFile.getAbsolutePath());
-                //create directories for sub directories in zip
-                new File(newFile.getParent()).mkdirs();
-                FileOutputStream fos = new FileOutputStream(newFile);
-                int len;
-                while ((len = zis.read(buffer)) > 0) {
-                    fos.write(buffer, 0, len);
-                }
-                fos.close();
-                //close this ZipEntry
-                zis.closeEntry();
-                ze = zis.getNextEntry();
-            }
-            //close last ZipEntry
-            zis.closeEntry();
-            zis.close();
-            fis.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-    }
-
-    static void downloadFromInternet(String fileUrl, File dest) throws IOException {
-        URL url = new URL(fileUrl);
-        InputStream is = url.openStream();
-        OutputStream os = Files.newOutputStream(dest.toPath());
-
-        byte[] b = new byte[2048];
-        int length;
-
-        while ((length = is.read(b)) != -1) {
-            os.write(b, 0, length);
-        }
-
-        is.close();
-        os.close();
-    }
-
-    private static void copyFile(File src, File dest) throws IOException {
-        // Créer l'objet File Reader
-        FileReader fr = new FileReader(src);
-        // Créer l'objet BufferedReader
-        BufferedReader br = new BufferedReader(fr);
-        // Créer l'objet File Writer
-        FileWriter fw = new FileWriter(dest);
-        String str;
-        // Copie le contenu dans le nouveau fichier
-        while((str = br.readLine()) != null)
-        {
-            fw.write(str);
-            fw.write(System.lineSeparator());
-            fw.flush();
-        }
-        fw.close();
     }
 
     static String getJarLink() {
@@ -270,9 +147,18 @@ public class Bootstrap {
 
         infosLabel.setText("V\u00e9rification de Java 17");
         String javaHome = System.getenv("JAVA_HOME");
-        System.out.println(javaHome);
+        String[] javaHomeSplit1 = javaHome.split(";");
+        String pattern = Pattern.quote(separatorChar);
+        String[] javaHomeSplit2 = javaHomeSplit1[0].split(pattern);
+        String firstReferencedJavaVersion = javaHomeSplit2[javaHomeSplit2.length - 1];
+        String[] javaHomeSplit3 = firstReferencedJavaVersion.split("\\.");
+        String firstReferencedJavaGlobalVersion = javaHomeSplit3[0];
+        System.out.println("%JAVA_HOME%: " + javaHome);
+        System.out.println("First referenced java: " + javaHomeSplit1[0]);
+        System.out.println("Last part of first referenced java: " + firstReferencedJavaVersion);
+        System.out.println("First referenced java global version: " + firstReferencedJavaGlobalVersion);
 
-        if (javaHome.contains("17")) {
+        if (firstReferencedJavaGlobalVersion.contains("17")) {
             System.out.println("Java 17 détecté");
             infosLabel.setText("Java 17 d\u00e9tect\u00e9");
         } else {
@@ -284,7 +170,7 @@ public class Bootstrap {
                     throw new RuntimeException(e);
                 }
             });
-            PopUpMessages.normalMessage("Java 17 non d\u00e9tect\u00e9", "Vous avez besoin de  Java 17, cliquez OK", t);
+            normalMessage("Java 17 non d\u00e9tect\u00e9", "Vous avez besoin de  Java 17, cliquez OK", t);
         }
 
     }
@@ -344,7 +230,7 @@ public class Bootstrap {
             infosLabel.setText("Lancement...");
             launch();
         } catch (LaunchException | IOException e) {
-            PopUpMessages.errorMessage("Erreur", "Erreur au lancement  du launcher");
+            errorMessage("Erreur", "Erreur au lancement  du launcher");
             throw new RuntimeException(e);
         }
 

@@ -24,4 +24,5 @@ dependencies {
     implementation 'fr.flowarg:openlauncherlib:3.2.5'
     implementation 'org.json:json:20220924'
     implementation 'com.github.Litarvan:Swinger:master-SNAPSHOT'
+    implementation 'com.github.TimEtOff:TimUtilsLib:1.1'
 }
