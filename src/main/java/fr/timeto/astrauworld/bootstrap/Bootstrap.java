@@ -1,25 +1,19 @@
 package fr.timeto.astrauworld.bootstrap;
 
-import fr.theshark34.openlauncherlib.LaunchException;
 import fr.theshark34.openlauncherlib.util.Saver;
 import fr.theshark34.swinger.Swinger;
 import fr.theshark34.openlauncherlib.util.SplashScreen;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import static java.lang.Thread.sleep;
 import static fr.timeto.timutilslib.PopUpMessages.*;
 import static fr.timeto.timutilslib.CustomFonts.*;
 import static fr.timeto.timutilslib.TimFilesUtils.*;
@@ -28,9 +22,6 @@ public class Bootstrap {
 
     static SplashScreen splash = new SplashScreen("Astrauworld Launcher", Swinger.getResourceIgnorePath("/splash.png"));
     static JPanel panel = splash.getContentPane();
-    static BufferedImage loadingImage = Swinger.getResourceIgnorePath("/loading.gif");
-    static ImageIcon loadingIcon = new ImageIcon(Swinger.getResourceIgnorePath("/loading.gif"));
-    static JLabel loadingLabel = new JLabel();
 
     static String separatorChar = System.getProperty("file.separator");
     static String userAppDataDir = System.getenv("APPDATA");
@@ -51,35 +42,14 @@ public class Bootstrap {
     static Saver currentSaver = new Saver(currentPropertiesPath);
     static Saver newSaver = new Saver(newPropertiesPath);
 
-    static JLabel infosLabel = new JLabel("V\u00e9rification de test", SwingConstants.CENTER);
-
-    @SuppressWarnings("all")
-    static BufferedImage rotatingImage(BufferedImage image, int rad) {
-
-
-        final double rads = Math.toRadians(rad);
-        final double sin = Math.abs(Math.sin(rads));
-        final double cos = Math.abs(Math.cos(rads));
-        final int w = (int) Math.floor(image.getWidth() * cos + image.getHeight() * sin);
-        final int h = (int) Math.floor(image.getHeight() * cos + image.getWidth() * sin);
-        final BufferedImage rotatedImage = new BufferedImage(w, h, image.getType());
-        final AffineTransform at = new AffineTransform();
-        at.translate(w / 2, h / 2);
-        at.rotate(rads,0, 0);
-        at.translate(-image.getWidth() / 2, -image.getHeight() / 2);
-        final AffineTransformOp rotateOp = new AffineTransformOp(at, AffineTransformOp.TYPE_BILINEAR);
-        rotateOp.filter(image,rotatedImage);
-
-        return rotatedImage;
-
-    }
+    static JLabel infosLabel = new JLabel("Si vous voyez ca, c'est pas bien", SwingConstants.CENTER);
 
     static String getJarLink() {
         return "https://github.com/AstrauworldMC/launcher/releases/download/" + newSaver.get("launcherVersion") + "/launcher.jar";
     }
 
     static void setPropertiesFile() {
-        infosLabel.setText("V\u00e9rification des infos de la derni\u00e8re version");
+        infosLabel.setText("V\u00e9rification de la derni\u00e8re version");
 
         try {
         newPropertiesFile.createNewFile();
@@ -108,21 +78,42 @@ public class Bootstrap {
     }
 
     static void updateJar() {
-        infosLabel.setText("Mise à jour du launcher");
+        setPropertiesFile();
+
+        System.out.println();
+        System.out.println("---- JAR UPDATE ----");
+
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        t.start();
+        try {
+            t.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        infosLabel.setText("Mise \u00e0 jour du launcher");
 
         try {
-            launcherJarFile.createNewFile();
-            System.out.println("jar created");
+            if (launcherJarFile.createNewFile()) {
+                currentSaver.set("launcherVersion", "");
+                System.out.println("jar created");
+            }
         } catch (IOException ignored) {}
 
         if (!Objects.equals(currentSaver.get("launcherVersion"), newSaver.get("launcherVersion"))) {
-            System.out.println(currentSaver.get("launcherVersion"));
-            System.out.println(newSaver.get("launcherVersion"));
-            System.out.println("pas egal");
-            infosLabel.setText("T\u00e9l\u00e9chargement de la derni\u00e8re version...");
+            System.out.println("Current: " + currentSaver.get("launcherVersion"));
+            System.out.println("New: " + newSaver.get("launcherVersion"));
+            System.out.println("pas égal");
+            infosLabel.setText("T\u00e9l\u00e9chargement de la mise \u00e0 jour");
             try {
                 downloadFromInternet(getJarLink(), launcherJarFile);
-                System.out.println("jar downloaded?");
+                System.out.println("jar downloaded");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -134,6 +125,7 @@ public class Bootstrap {
             }
 
         } else {
+            System.out.println("Dernière version détectée");
             infosLabel.setText("Derni\u00e8re version d\u00e9tect\u00e9e");
         }
     }
@@ -141,9 +133,8 @@ public class Bootstrap {
     static void update() {
         astrauworldFolder.mkdir();
 
-        setPropertiesFile();
-
-        updateJar();
+        System.out.println();
+        System.out.println("---- JAVA 17 VERIF ----");
 
         infosLabel.setText("V\u00e9rification de Java 17");
         String javaHome = System.getenv("JAVA_HOME");
@@ -173,11 +164,13 @@ public class Bootstrap {
             normalMessage("Java 17 non d\u00e9tect\u00e9", "Vous avez besoin de  Java 17, cliquez OK", t);
         }
 
+        updateJar();
+
     }
 
-    static void launch() throws LaunchException, IOException {
+    static void launch() throws IOException {
         String [] parts = System.getenv("JAVA_HOME").split( ";" );
-        String cmd = "\"" + parts[0] + separatorChar + "bin" + separatorChar + "java" + "\" -cp \"" + launcherJar + "\" fr.timeto.astrauworld.launcher.LauncherFrame";
+        String cmd = "\"" + parts[0] + separatorChar + "bin" + separatorChar + "java" + "\" -cp \"" + launcherJar + "\" fr.timeto.astrauworld.launcher.main.LauncherFrame";
 
         System.out.println("Commande: " + cmd);
 
@@ -190,46 +183,44 @@ public class Bootstrap {
 
     public static void main(String[] args) {
         initFonts();
+        JPanel loadingSpinner = new LoadingSpinner();
+        loadingSpinner.setBounds(0, 0, splash.getWidth(), splash.getHeight());
+        splash.add(loadingSpinner);
 
         splash.setIconImage(Swinger.getResourceIgnorePath("/icon.png"));
         splash.setSize(346, 446);
         panel.setLayout(null);
 
-        loadingLabel.setBounds(14, 59, 319, 328);
-        splash.add(loadingLabel);
-
-        AtomicInteger i = new AtomicInteger(1);
-        Thread t = new Thread(() -> {
-            while(i.get() < 361) {
-                loadingLabel.setIcon(new ImageIcon(rotatingImage(loadingImage, i.get())));
-                i.addAndGet(1);
-
-                if (i.get() == 360) {
-                    i.set(1);
-                }
-
-                try {
-                    sleep(4);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }); // TODO réussir à ajouter un loading qui marche mdrr
-    //    t.start();
-
         infosLabel.setBounds(34, 375, 278, 20);
         infosLabel.setForeground(Color.WHITE);
-        infosLabel.setFont(kollektifFont.deriveFont(16f));
+        infosLabel.setFont(kollektifBoldFont.deriveFont(16f));
         splash.add(infosLabel);
 
         splash.display();
 
         update();
 
+        infosLabel.setText("Lancement...");
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        t.start();
         try {
-            infosLabel.setText("Lancement...");
+            t.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        System.out.println();
+        System.out.println("---- LAUNCH ----");
+
+        try {
             launch();
-        } catch (LaunchException | IOException e) {
+        } catch (IOException e) {
             errorMessage("Erreur", "Erreur au lancement  du launcher");
             throw new RuntimeException(e);
         }
