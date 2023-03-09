@@ -54,7 +54,7 @@ public class LoadingSpinner extends JPanel {
         Arc2D.Double arc = new Arc2D.Double(55, 100, 235, 235, angle, extent, Arc2D.OPEN);
         BasicStroke stroke = new BasicStroke(10, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND);
         g2d.setStroke(stroke);
-        g2d.setColor(Swinger.getTransparentWhite(70));
+        g2d.setColor(Swinger.getTransparentWhite(50));
         g2d.draw(arc);
         g2d.dispose();
     }
