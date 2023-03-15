@@ -4,7 +4,6 @@ import fr.theshark34.openlauncherlib.util.Saver;
 import fr.theshark34.swinger.Swinger;
 import fr.theshark34.openlauncherlib.util.SplashScreen;
 import fr.theshark34.swinger.colored.SColoredBar;
-import fr.timeto.timutilslib.PopUpMessages;
 import net.harawata.appdirs.AppDirsFactory;
 import org.codehaus.plexus.archiver.tar.TarGZipUnArchiver;
 import org.codehaus.plexus.archiver.zip.ZipUnArchiver;
@@ -24,6 +23,7 @@ import java.util.regex.Pattern;
 
 import static fr.theshark34.swinger.Swinger.getTransparentWhite;
 import static fr.timeto.timutilslib.CustomFonts.*;
+import static fr.timeto.timutilslib.PopUpMessages.*;
 import static fr.timeto.timutilslib.TimFilesUtils.*;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
@@ -116,7 +116,7 @@ public class Bootstrap {
 
 
         try {
-            downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/currentLauncher.properties", newPropertiesFile);
+            downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/launcher.properties", newPropertiesFile);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -473,7 +473,7 @@ public class Bootstrap {
                 Thread ok = new Thread(() -> {
                     System.exit(1);
                 });
-                PopUpMessages.errorMessage("Erreur", "Désolé, votre système d´exploitation (" + OS + ") n'est pas compatible", ok);
+                errorMessage("Erreur", "Désolé, votre système d´exploitation (" + OS + ") n'est pas compatible", ok);
                 println("OS non supporté");
                 return null;
             }
@@ -524,7 +524,7 @@ public class Bootstrap {
             Thread ok = new Thread(() -> {
                 System.exit(1);
             });
-            PopUpMessages.errorMessage("Erreur", "Désolé, votre système d'exploitation (" + OS + ") n'est pas compatible", ok);
+            errorMessage("Erreur", "Désolé, votre système d'exploitation (" + OS + ") n'est pas compatible", ok);
             println("OS non supporté");
         }
 
@@ -580,7 +580,7 @@ public class Bootstrap {
             throw new RuntimeException(e);
         }
 
-    /*    println("");
+        println("");
         println("---- LAUNCH ----");
 
         try {
@@ -588,7 +588,7 @@ public class Bootstrap {
         } catch (IOException e) {
             errorMessage("Erreur", "Erreur au lancement  du launcher");
             throw new RuntimeException(e);
-        } */
+        }
 
     }
 }
