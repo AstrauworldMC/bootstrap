@@ -1,9 +1,14 @@
 package fr.timeto.astrauworld.bootstrap;
 
+import fr.theshark34.openlauncherlib.JavaUtil;
+import fr.theshark34.openlauncherlib.external.ClasspathConstructor;
+import fr.theshark34.openlauncherlib.external.ExternalLaunchProfile;
+import fr.theshark34.openlauncherlib.external.ExternalLauncher;
 import fr.theshark34.openlauncherlib.util.Saver;
 import fr.theshark34.swinger.Swinger;
 import fr.theshark34.openlauncherlib.util.SplashScreen;
 import fr.theshark34.swinger.colored.SColoredBar;
+import fr.timeto.timutilslib.PopUpMessages;
 import net.harawata.appdirs.AppDirsFactory;
 import org.codehaus.plexus.archiver.tar.TarGZipUnArchiver;
 import org.codehaus.plexus.archiver.zip.ZipUnArchiver;
@@ -12,9 +17,7 @@ import org.codehaus.plexus.logging.console.ConsoleLoggerManager;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.NoSuchElementException;
@@ -62,7 +65,7 @@ public class Bootstrap {
             super.setText(parseUnicode(text));
         }
     };
-    static SColoredBar progressBar = new SColoredBar(getTransparentWhite(25), Color.RED);
+    static SColoredBar progressBar = new SColoredBar(getTransparentWhite(25), new Color(227, 6, 19));
     static JLabel percentLabel = new JLabel("", SwingConstants.RIGHT);
     static JLabel bytesLabel = new JLabel("", SwingConstants.LEFT);
 
@@ -103,6 +106,13 @@ public class Bootstrap {
                 .replaceAll("\u00c2", "Â");
     }
 
+    private static String convertStringArrayToString(String[] strArr, String delimiter) {
+        StringBuilder sb = new StringBuilder();
+        for (String str : strArr)
+            sb.append(str).append(delimiter);
+        return sb.substring(0, sb.length() - 1);
+    }
+
     static String getJarLink() {
         return "https://github.com/AstrauworldMC/launcher/releases/download/" + newSaver.get("launcherVersion") + "/launcher.jar";
     }
@@ -111,13 +121,14 @@ public class Bootstrap {
         infosLabel.setText("V\u00e9rification de la derni\u00e8re version");
 
         try {
-        newPropertiesFile.createNewFile();
+            newPropertiesFile.createNewFile();
         } catch (IOException ignored) {}
 
 
         try {
-            downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/launcher.properties", newPropertiesFile);
-        } catch (IOException e) {
+        //    downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/launcher.properties", newPropertiesFile);
+            downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/currentLauncher.properties", newPropertiesFile);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
@@ -132,22 +143,11 @@ public class Bootstrap {
     static void updateJar() {
         setPropertiesFile();
 
+        currentSaver.load();
+        newSaver.load();
+
         println("");
         println("---- JAR UPDATE ----");
-
-        Thread t = new Thread(() -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        });
-        t.start();
-        try {
-            t.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
         infosLabel.setText("Mise \u00e0 jour du launcher");
 
@@ -163,23 +163,20 @@ public class Bootstrap {
             println("New: " + newSaver.get("launcherVersion"));
             println("pas égal");
             infosLabel.setText("T\u00e9l\u00e9chargement de la mise \u00e0 jour");
+            progressBar.setVisible(true);
+            percentLabel.setVisible(true);
+            bytesLabel.setVisible(true);
             try {
-                progressBar.setVisible(true);
-                percentLabel.setVisible(true);
-                bytesLabel.setVisible(true);
+                launcherJarFile.createNewFile();
                 downloadFromInternet(getJarLink(), launcherJarFile, progressBar, percentLabel, bytesLabel);
                 println("jar downloaded");
-                try {
-                    copyFile(newPropertiesFile, currentPropertiesFile, true);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                progressBar.setVisible(false);
-                percentLabel.setVisible(false);
-                bytesLabel.setVisible(false);
-            } catch (IOException e) {
+                copyFile(newPropertiesFile, currentPropertiesFile, true);
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            progressBar.setVisible(false);
+            percentLabel.setVisible(false);
+            bytesLabel.setVisible(false);
 
         } else {
             println("Dernière version détectée");
@@ -190,7 +187,7 @@ public class Bootstrap {
     static void update() {
         astrauworldFolder.mkdir();
 
-        getJava();
+        customJavaFolder = getJava();
 
         updateJar();
 
@@ -224,7 +221,7 @@ public class Bootstrap {
 
         } catch (Exception e) {
             File jre17 = new File(customJavaDir + File.separator + "jre-17");
-            jre17.mkdir();
+            jre17.mkdirs();
 
             println("Aucun Java 17 dans %JAVA_HOME% détecté");
 
@@ -482,22 +479,35 @@ public class Bootstrap {
     }
 
     static void launch() throws IOException {
+
+        println("");
+        println("---- LAUNCH ----");
+
         newPropertiesPath.toFile().delete();
 
-        String cmd = "\"" + getJava() + File.separator + "bin" + File.separator + "java" + "\" -cp \"" + launcherJar + "\" fr.timeto.astrauworld.launcher.main.Main";
-
-        println("Commande: " + cmd);
+        String javaCommand;
+        final Path java = Paths.get(String.valueOf(customJavaFolder), "bin", "java");
+        if (OS.toLowerCase().contains("win"))
+            javaCommand = "\"" + java + "\"";
+        else javaCommand = java.toString();
+        JavaUtil.setJavaCommand(javaCommand);
 
         try {
-            Runtime rt = Runtime.getRuntime();
 
-            System.out.println();
-            System.out.println();
-            Process process = rt.exec(cmd);
+            ClasspathConstructor classpath = new ClasspathConstructor();
+            classpath.add(Paths.get(launcherJarFile.getAbsolutePath()));
+
+            ExternalLaunchProfile profile = new ExternalLaunchProfile("fr.timeto.astrauworld.launcher.main.LauncherFrame", classpath.make());
+            ExternalLauncher launcher = new ExternalLauncher(profile);
+
+            Process process = launcher.launch();
 
             splash.stop();
 
             BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            System.out.println();
+            System.out.println();
 
             String s;
             while ((s = stdInput.readLine()) != null) {
@@ -512,82 +522,82 @@ public class Bootstrap {
     }
 
     public static void main(String[] args) {
-        initFonts();
+        try {
+            initFonts();
 
-        if (OS.toLowerCase().contains("win")) {
-            println("Windows OK");
-        } else if (OS.toLowerCase().contains("mac")) {
-            println("MacOS OK");
-        } else if (OS.toLowerCase().contains("nix") || OS.toLowerCase().contains("nux") || OS.toLowerCase().contains("aix")) {
-            println("Unix OK");
-        } else {
-            Thread ok = new Thread(() -> {
-                System.exit(1);
+            if (OS.toLowerCase().contains("win")) {
+                println("Windows OK");
+            } else if (OS.toLowerCase().contains("mac")) {
+                println("MacOS OK");
+            } else if (OS.toLowerCase().contains("nix") || OS.toLowerCase().contains("nux") || OS.toLowerCase().contains("aix")) {
+                println("Unix OK");
+            } else {
+                Thread ok = new Thread(() -> {
+                    System.exit(1);
+                });
+                errorMessage("Erreur", "Désolé, votre système d'exploitation (" + OS + ") n'est pas compatible", ok);
+                println("OS non supporté");
+            }
+
+            println("Astrauworld Launcher dir: " + astrauworldDir);
+
+            oldCurrentPropertiesFile.delete();
+
+            JPanel loadingSpinner = new LoadingSpinner();
+            loadingSpinner.setBounds(0, 0, splash.getWidth(), splash.getHeight());
+            splash.add(loadingSpinner);
+
+            splash.setIconImage(Swinger.getResourceIgnorePath("/icon.png"));
+            splash.setSize(346, 446);
+            panel.setLayout(null);
+
+            infosLabel.setBounds(34, 372, 278, 20);
+            infosLabel.setForeground(Color.WHITE);
+            infosLabel.setFont(kollektifBoldFont.deriveFont(16f));
+            splash.add(infosLabel);
+
+            progressBar.setBounds(0, 431, 346, 15);
+            splash.add(progressBar);
+            progressBar.setVisible(false);
+
+            percentLabel.setBounds(8, 411, 334, 20);
+            percentLabel.setForeground(Color.WHITE);
+            percentLabel.setFont(infosLabel.getFont());
+            splash.add(percentLabel);
+            percentLabel.setVisible(false);
+
+            bytesLabel.setBounds(8, 411, 334, 20);
+            bytesLabel.setForeground(Color.WHITE);
+            bytesLabel.setFont(infosLabel.getFont());
+            splash.add(bytesLabel);
+            bytesLabel.setVisible(false);
+
+            splash.display();
+
+            update();
+
+            infosLabel.setText("Lancement...");
+            Thread t = new Thread(() -> {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             });
-            errorMessage("Erreur", "Désolé, votre système d'exploitation (" + OS + ") n'est pas compatible", ok);
-            println("OS non supporté");
-        }
-
-        println("Astrauworld Launcher dir: " + astrauworldDir);
-
-        oldCurrentPropertiesFile.delete();
-
-        JPanel loadingSpinner = new LoadingSpinner();
-        loadingSpinner.setBounds(0, 0, splash.getWidth(), splash.getHeight());
-        splash.add(loadingSpinner);
-
-        splash.setIconImage(Swinger.getResourceIgnorePath("/icon.png"));
-        splash.setSize(346, 446);
-        panel.setLayout(null);
-
-        infosLabel.setBounds(34, 372, 278, 20);
-        infosLabel.setForeground(Color.WHITE);
-        infosLabel.setFont(kollektifBoldFont.deriveFont(16f));
-        splash.add(infosLabel);
-
-        progressBar.setBounds(0, 431, 346, 15);
-        splash.add(progressBar);
-        progressBar.setVisible(false);
-
-        percentLabel.setBounds(8, 411, 334, 20);
-        percentLabel.setForeground(Color.WHITE);
-        percentLabel.setFont(infosLabel.getFont());
-        splash.add(percentLabel);
-        percentLabel.setVisible(false);
-
-        bytesLabel.setBounds(8, 411, 334, 20);
-        bytesLabel.setForeground(Color.WHITE);
-        bytesLabel.setFont(infosLabel.getFont());
-        splash.add(bytesLabel);
-        bytesLabel.setVisible(false);
-
-        splash.display();
-
-        update();
-
-        infosLabel.setText("Lancement...");
-        Thread t = new Thread(() -> {
+            t.start();
             try {
-                Thread.sleep(2000);
+                t.join();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-        });
-        t.start();
-        try {
-            t.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
-        println("");
-        println("---- LAUNCH ----");
-
-        try {
             launch();
-        } catch (IOException e) {
-            errorMessage("Erreur", "Erreur au lancement  du launcher");
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Thread t = new Thread(() -> {
+                System.exit(1);
+            });
+            PopUpMessages.errorMessage("Erreur", e.getLocalizedMessage(), t);
         }
 
     }
