@@ -24,7 +24,7 @@ dependencies {
     implementation 'fr.flowarg:openlauncherlib:3.2.5'
     implementation 'org.json:json:20220924'
     implementation 'fr.theshark34.swinger:swinger:1.0.1-BETA'
-    implementation 'com.github.TimEtOff:TimUtilsLib:99b3471ea5b5f4de7d4c9821451b72dab134dc5d'
+    implementation 'com.github.TimEtOff:TimUtilsLib:2f0f2fb19669e9348c0845ebd5ff5470b21e0e02'
     implementation 'net.harawata:appdirs:1.2.1'
     implementation 'org.codehaus.plexus:plexus-archiver:2.2'
 }

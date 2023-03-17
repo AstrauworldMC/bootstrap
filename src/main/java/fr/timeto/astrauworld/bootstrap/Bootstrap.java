@@ -17,6 +17,9 @@ import org.codehaus.plexus.logging.console.ConsoleLoggerManager;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.URI;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -33,6 +36,8 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 public class Bootstrap {
 
     static String OS = System.getProperty("os.name");
+    static final String version = "1.2.0"; // TODO Changer la version
+    static boolean isException = false;
 
     static SplashScreen splash = new SplashScreen("Astrauworld Launcher", Swinger.getResourceIgnorePath("/splash.png"));
     static JPanel panel = splash.getContentPane();
@@ -76,6 +81,15 @@ public class Bootstrap {
         System.out.println("[" + dtf.format(now) + "] [Astrauworld Bootstrap] " + str);
     }
 
+    public static void setTaskbarIcon(Image image) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+
+        Class taskbar = Class.forName("java.awt.Taskbar");
+        Method getTaskbar = taskbar.getDeclaredMethod("getTaskbar");
+        Object instance = getTaskbar.invoke(taskbar);
+        Method setIconImage = instance.getClass().getDeclaredMethod("setIconImage", Image.class);
+        setIconImage.invoke(instance, image);
+    }
+
     public static String parseUnicode(String oldString) {
         return oldString
                 .replaceAll("é", "\u00e9")
@@ -117,7 +131,7 @@ public class Bootstrap {
         return "https://github.com/AstrauworldMC/launcher/releases/download/" + newSaver.get("launcherVersion") + "/launcher.jar";
     }
 
-    static void setPropertiesFile() {
+    static void setPropertiesFile() throws Exception {
         infosLabel.setText("V\u00e9rification de la derni\u00e8re version");
 
         try {
@@ -125,11 +139,15 @@ public class Bootstrap {
         } catch (IOException ignored) {}
 
 
+
         try {
-        //    downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/launcher.properties", newPropertiesFile);
-            downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/currentLauncher.properties", newPropertiesFile);
+            downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/launcher.properties", newPropertiesFile);
+        //     downloadFromInternet("https://raw.githubusercontent.com/AstrauworldMC/launcher/Beta2.3.0/src/main/resources/launcher.properties", newPropertiesFile);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            currentPropertiesFile.delete();
+            newPropertiesFile.delete();
+            launcherJarFile.delete();
+            throw e;
         }
 
         if (currentSaver.get("launcherVersion") == null) {
@@ -140,12 +158,14 @@ public class Bootstrap {
         }
     }
 
-    static void updateJar() {
-        setPropertiesFile();
+    static void verifyBootstrapVersion() throws Exception {
+        if (!version.equals(newSaver.get("bootstrapVersion"))) {
+            throw new Exception("Nouvelle version du bootstrap disponible");
+        }
 
-        currentSaver.load();
-        newSaver.load();
+    }
 
+    static void updateJar() throws Exception {
         println("");
         println("---- JAR UPDATE ----");
 
@@ -158,22 +178,25 @@ public class Bootstrap {
             }
         } catch (IOException ignored) {}
 
+        println("Current: " + currentSaver.get("launcherVersion"));
+        println("New: " + newSaver.get("launcherVersion"));
         if (!Objects.equals(currentSaver.get("launcherVersion"), newSaver.get("launcherVersion"))) {
-            println("Current: " + currentSaver.get("launcherVersion"));
-            println("New: " + newSaver.get("launcherVersion"));
             println("pas égal");
             infosLabel.setText("T\u00e9l\u00e9chargement de la mise \u00e0 jour");
             progressBar.setVisible(true);
             percentLabel.setVisible(true);
             bytesLabel.setVisible(true);
+            launcherJarFile.createNewFile();
             try {
-                launcherJarFile.createNewFile();
                 downloadFromInternet(getJarLink(), launcherJarFile, progressBar, percentLabel, bytesLabel);
-                println("jar downloaded");
-                copyFile(newPropertiesFile, currentPropertiesFile, true);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                currentPropertiesFile.delete();
+                newPropertiesFile.delete();
+                launcherJarFile.delete();
+                throw e;
             }
+            println("jar downloaded");
+            copyFile(newPropertiesFile, currentPropertiesFile, true);
             progressBar.setVisible(false);
             percentLabel.setVisible(false);
             bytesLabel.setVisible(false);
@@ -184,16 +207,31 @@ public class Bootstrap {
         }
     }
 
-    static void update() {
+    static void update() throws Exception {
         astrauworldFolder.mkdir();
 
-        customJavaFolder = getJava();
+        if (!isException) {
+            setPropertiesFile();
 
-        updateJar();
+            currentSaver.load();
+            newSaver.load();
+        }
+
+        if (!isException) {
+            verifyBootstrapVersion();
+        }
+
+        if (!isException) {
+            customJavaFolder = getJava();
+        }
+
+        if (!isException) {
+            updateJar();
+        }
 
     }
 
-    static File getJava() {
+    static File getJava() throws Exception {
         println("");
         println("---- JAVA 17 VERIF ----");
 
@@ -231,111 +269,15 @@ public class Bootstrap {
                 } else {
 
                     if (System.getProperty("sun.arch.data.model").equals("64")) {
-                        try {
-                            File zip = new File(customJavaFolder + File.separator + "jre17.zip");
-                            zip.createNewFile();
-                            infosLabel.setText("Téléchargement de Java 17");
-                            println("Téléchargement de Java 17 pour Windows 64bits");
-                            progressBar.setVisible(true);
-                            percentLabel.setVisible(true);
-                            bytesLabel.setVisible(true);
-                            downloadFromInternet(
-                                    "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-windows-amd64-full.zip",
-                                    zip,
-                                    progressBar,
-                                    percentLabel,
-                                    bytesLabel
-                            );
-                            progressBar.setVisible(false);
-                            percentLabel.setVisible(false);
-                            bytesLabel.setVisible(false);
-
-                            final ZipUnArchiver ua = new ZipUnArchiver();
-// Logging - as @Akom noted, logging is mandatory in newer versions, so you can use a code like this to configure it:
-                            ConsoleLoggerManager manager = new ConsoleLoggerManager();
-                            manager.initialize();
-                            ua.enableLogging(manager.getLoggerForComponent("bla"));
-// -- end of logging part
-                            ua.setSourceFile(zip);
-                            ua.setDestDirectory(customJavaFolder);
-                            ua.extract();
-
-                            zip.delete();
-
-                            Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
-
-                            new File(jre17 + File.separator + "jre-17.0.6-full").delete();
-
-                            return jre17;
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
-                    }
-
-                    else if (System.getProperty("sun.arch.data.model").equals("32")) {
-                        try {
-                            File zip = new File(jre17 + File.separator + "jre17.zip");
-                            zip.createNewFile();
-                            infosLabel.setText("Téléchargement de Java 17");
-                            println("Téléchargement de Java 17 pour Windows 32bits");
-                            progressBar.setVisible(true);
-                            percentLabel.setVisible(true);
-                            bytesLabel.setVisible(true);
-                            downloadFromInternet(
-                                    "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-windows-i586-full.zip",
-                                    zip,
-                                    progressBar,
-                                    percentLabel,
-                                    bytesLabel
-                            );
-                            progressBar.setVisible(false);
-                            percentLabel.setVisible(false);
-                            bytesLabel.setVisible(false);
-
-                            final ZipUnArchiver ua = new ZipUnArchiver();
-// Logging - as @Akom noted, logging is mandatory in newer versions, so you can use a code like this to configure it:
-                            ConsoleLoggerManager manager = new ConsoleLoggerManager();
-                            manager.initialize();
-                            ua.enableLogging(manager.getLoggerForComponent("bla"));
-// -- end of logging part
-                            ua.setSourceFile(zip);
-                            ua.setDestDirectory(customJavaFolder);
-                            ua.extract();
-
-                            zip.delete();
-
-                            Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
-
-                            new File(jre17 + File.separator + "jre-17.0.6-full").delete();
-
-                            return jre17;
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
-                    }
-
-                    else {
-                        throw new RuntimeException("Erreur au téléchargement de Java 17");
-                    }
-                }
-
-            }
-
-            else if (OS.toLowerCase().contains("mac")) {
-                if (new File(jre17 + File.separator + "bin" + File.separator + "java").exists()) {
-                    return jre17;
-                } else {
-
-                    try {
-                        File zip = new File(jre17 + File.separator + "jre17.zip");
+                        File zip = new File(customJavaFolder + File.separator + "jre17.zip");
                         zip.createNewFile();
                         infosLabel.setText("Téléchargement de Java 17");
-                        println("Téléchargement de Java 17 pour Mac");
+                        println("Téléchargement de Java 17 pour Windows 64bits");
                         progressBar.setVisible(true);
                         percentLabel.setVisible(true);
                         bytesLabel.setVisible(true);
                         downloadFromInternet(
-                                "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-macos-amd64-full.zip",
+                                "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-windows-amd64-full.zip",
                                 zip,
                                 progressBar,
                                 percentLabel,
@@ -357,116 +299,177 @@ public class Bootstrap {
 
                         zip.delete();
 
-                        Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full.jre"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
+                        Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
 
-                        new File(jre17 + File.separator + "jre-17.0.6-full.jre").delete();
+                        new File(jre17 + File.separator + "jre-17.0.6-full").delete();
 
                         return jre17;
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
+                    } else if (System.getProperty("sun.arch.data.model").equals("32")) {
+                        File zip = new File(jre17 + File.separator + "jre17.zip");
+                        zip.createNewFile();
+                        infosLabel.setText("Téléchargement de Java 17");
+                        println("Téléchargement de Java 17 pour Windows 32bits");
+                        progressBar.setVisible(true);
+                        percentLabel.setVisible(true);
+                        bytesLabel.setVisible(true);
+                        downloadFromInternet(
+                                "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-windows-i586-full.zip",
+                                zip,
+                                progressBar,
+                                percentLabel,
+                                bytesLabel
+                        );
+                        progressBar.setVisible(false);
+                        percentLabel.setVisible(false);
+                        bytesLabel.setVisible(false);
+
+                        final ZipUnArchiver ua = new ZipUnArchiver();
+// Logging - as @Akom noted, logging is mandatory in newer versions, so you can use a code like this to configure it:
+                        ConsoleLoggerManager manager = new ConsoleLoggerManager();
+                        manager.initialize();
+                        ua.enableLogging(manager.getLoggerForComponent("bla"));
+// -- end of logging part
+                        ua.setSourceFile(zip);
+                        ua.setDestDirectory(customJavaFolder);
+                        ua.extract();
+
+                        zip.delete();
+
+                        Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
+
+                        new File(jre17 + File.separator + "jre-17.0.6-full").delete();
+
+                        return jre17;
+                    } else {
+                        throw new RuntimeException("Erreur au téléchargement de Java 17");
                     }
+                }
+
+            } else if (OS.toLowerCase().contains("mac")) {
+                if (new File(jre17 + File.separator + "bin" + File.separator + "java").exists()) {
+                    return jre17;
+                } else {
+                    File zip = new File(jre17 + File.separator + "jre17.zip");
+                    zip.createNewFile();
+                    infosLabel.setText("Téléchargement de Java 17");
+                    println("Téléchargement de Java 17 pour Mac");
+                    progressBar.setVisible(true);
+                    percentLabel.setVisible(true);
+                    bytesLabel.setVisible(true);
+                    downloadFromInternet(
+                            "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-macos-amd64-full.zip",
+                            zip,
+                            progressBar,
+                            percentLabel,
+                            bytesLabel
+                    );
+                    progressBar.setVisible(false);
+                    percentLabel.setVisible(false);
+                    bytesLabel.setVisible(false);
+
+                    final ZipUnArchiver ua = new ZipUnArchiver();
+// Logging - as @Akom noted, logging is mandatory in newer versions, so you can use a code like this to configure it:
+                    ConsoleLoggerManager manager = new ConsoleLoggerManager();
+                    manager.initialize();
+                    ua.enableLogging(manager.getLoggerForComponent("bla"));
+// -- end of logging part
+                    ua.setSourceFile(zip);
+                    ua.setDestDirectory(customJavaFolder);
+                    ua.extract();
+
+                    zip.delete();
+
+                    Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full.jre"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
+
+                    new File(jre17 + File.separator + "jre-17.0.6-full.jre").delete();
+
+                    return jre17;
 
                 }
-            }
-
-            else if (OS.toLowerCase().contains("nix") || OS.toLowerCase().contains("nux") || OS.toLowerCase().contains("aix")) {
+            } else if (OS.toLowerCase().contains("nix") || OS.toLowerCase().contains("nux") || OS.toLowerCase().contains("aix")) {
 
                 if (new File(jre17 + File.separator + "bin" + File.separator + "java").exists()) {
                     return jre17;
                 } else {
 
                     if (System.getProperty("sun.arch.data.model").equals("64")) {
-                        try {
-                            File zip = new File(jre17 + File.separator + "jre17.tar.gz");
-                            zip.createNewFile();
-                            infosLabel.setText("Téléchargement de Java 17");
-                            println("Téléchargement de Java 17 pour Unix 64bits");
-                            progressBar.setVisible(true);
-                            percentLabel.setVisible(true);
-                            bytesLabel.setVisible(true);
-                            downloadFromInternet(
-                                    "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-linux-amd64-full.tar.gz",
-                                    zip,
-                                    progressBar,
-                                    percentLabel,
-                                    bytesLabel
-                            );
-                            progressBar.setVisible(false);
-                            percentLabel.setVisible(false);
-                            bytesLabel.setVisible(false);
+                        File zip = new File(jre17 + File.separator + "jre17.tar.gz");
+                        zip.createNewFile();
+                        infosLabel.setText("Téléchargement de Java 17");
+                        println("Téléchargement de Java 17 pour Unix 64bits");
+                        progressBar.setVisible(true);
+                        percentLabel.setVisible(true);
+                        bytesLabel.setVisible(true);
+                        downloadFromInternet(
+                                "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-linux-amd64-full.tar.gz",
+                                zip,
+                                progressBar,
+                                percentLabel,
+                                bytesLabel
+                        );
+                        progressBar.setVisible(false);
+                        percentLabel.setVisible(false);
+                        bytesLabel.setVisible(false);
 
-                            final TarGZipUnArchiver ua = new TarGZipUnArchiver();
+                        final TarGZipUnArchiver ua = new TarGZipUnArchiver();
 // Logging - as @Akom noted, logging is mandatory in newer versions, so you can use a code like this to configure it:
-                            ConsoleLoggerManager manager = new ConsoleLoggerManager();
-                            manager.initialize();
-                            ua.enableLogging(manager.getLoggerForComponent("bla"));
+                        ConsoleLoggerManager manager = new ConsoleLoggerManager();
+                        manager.initialize();
+                        ua.enableLogging(manager.getLoggerForComponent("bla"));
 // -- end of logging part
-                            ua.setSourceFile(zip);
-                            ua.setDestDirectory(customJavaFolder);
-                            ua.extract();
+                        ua.setSourceFile(zip);
+                        ua.setDestDirectory(customJavaFolder);
+                        ua.extract();
 
-                            zip.delete();
+                        zip.delete();
 
-                            Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
+                        Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
 
-                            new File(jre17 + File.separator + "jre-17.0.6-full").delete();
+                        new File(jre17 + File.separator + "jre-17.0.6-full").delete();
 
-                            return jre17;
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
-                    }
+                        return jre17;
+                    } else if (System.getProperty("sun.arch.data.model").equals("32")) {
+                        File zip = new File(jre17 + File.separator + "jre17.tar.gz");
+                        zip.createNewFile();
+                        infosLabel.setText("Téléchargement de Java 17");
+                        println("Téléchargement de Java 17 pour Unix 32bits");
+                        progressBar.setVisible(true);
+                        percentLabel.setVisible(true);
+                        bytesLabel.setVisible(true);
+                        downloadFromInternet(
+                                "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-linux-i586.tar.gz",
+                                zip,
+                                progressBar,
+                                percentLabel,
+                                bytesLabel
+                        );
+                        progressBar.setVisible(false);
+                        percentLabel.setVisible(false);
+                        bytesLabel.setVisible(false);
 
-                    else if (System.getProperty("sun.arch.data.model").equals("32")) {
-                        try {
-                            File zip = new File(jre17 + File.separator + "jre17.tar.gz");
-                            zip.createNewFile();
-                            infosLabel.setText("Téléchargement de Java 17");
-                            println("Téléchargement de Java 17 pour Unix 32bits");
-                            progressBar.setVisible(true);
-                            percentLabel.setVisible(true);
-                            bytesLabel.setVisible(true);
-                            downloadFromInternet(
-                                    "https://download.bell-sw.com/java/17.0.6+10/bellsoft-jre17.0.6+10-linux-i586.tar.gz",
-                                    zip,
-                                    progressBar,
-                                    percentLabel,
-                                    bytesLabel
-                            );
-                            progressBar.setVisible(false);
-                            percentLabel.setVisible(false);
-                            bytesLabel.setVisible(false);
-
-                            final TarGZipUnArchiver ua = new TarGZipUnArchiver();
+                        final TarGZipUnArchiver ua = new TarGZipUnArchiver();
 // Logging - as @Akom noted, logging is mandatory in newer versions, so you can use a code like this to configure it:
-                            ConsoleLoggerManager manager = new ConsoleLoggerManager();
-                            manager.initialize();
-                            ua.enableLogging(manager.getLoggerForComponent("bla"));
+                        ConsoleLoggerManager manager = new ConsoleLoggerManager();
+                        manager.initialize();
+                        ua.enableLogging(manager.getLoggerForComponent("bla"));
 // -- end of logging part
-                            ua.setSourceFile(zip);
-                            ua.setDestDirectory(customJavaFolder);
-                            ua.extract();
+                        ua.setSourceFile(zip);
+                        ua.setDestDirectory(customJavaFolder);
+                        ua.extract();
 
-                            zip.delete();
+                        zip.delete();
 
-                            Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
+                        Files.move(Paths.get(customJavaFolder.getAbsolutePath() + File.separator + "jre-17.0.6-full"), Paths.get(jre17.getAbsolutePath()), REPLACE_EXISTING);
 
-                            new File(jre17 + File.separator + "jre-17.0.6-full").delete();
+                        new File(jre17 + File.separator + "jre-17.0.6-full").delete();
 
-                            return jre17;
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
-                    }
-
-                    else {
+                        return jre17;
+                    } else {
                         throw new RuntimeException("Erreur au téléchargement de Java 17");
                     }
                 }
 
-            }
-
-            else {
+            } else {
                 Thread ok = new Thread(() -> {
                     System.exit(1);
                 });
@@ -478,7 +481,7 @@ public class Bootstrap {
         }
     }
 
-    static void launch() throws IOException {
+    static void launch() throws Exception {
 
         println("");
         println("---- LAUNCH ----");
@@ -492,30 +495,36 @@ public class Bootstrap {
         else javaCommand = java.toString();
         JavaUtil.setJavaCommand(javaCommand);
 
-        try {
+        ClasspathConstructor classpath = new ClasspathConstructor() {
+            @Override
+            public String make()
+            {
+                final StringBuilder classPath = new StringBuilder();
 
-            ClasspathConstructor classpath = new ClasspathConstructor();
-            classpath.add(Paths.get(launcherJarFile.getAbsolutePath()));
+                for (int i = 0; i < this.files.size(); i++)
+                    if (OS.toLowerCase().contains("win"))
+                        classPath.append("\"" + files.get(i).toString() + "\"").append(i + 1 == files.size() ? "" : File.pathSeparator);
+                    else classPath.append(files.get(i).toString()).append(i + 1 == files.size() ? "" : File.pathSeparator);
 
-            ExternalLaunchProfile profile = new ExternalLaunchProfile("fr.timeto.astrauworld.launcher.main.LauncherFrame", classpath.make());
-            ExternalLauncher launcher = new ExternalLauncher(profile);
-
-            Process process = launcher.launch();
-
-            splash.stop();
-
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-            System.out.println();
-            System.out.println();
-
-            String s;
-            while ((s = stdInput.readLine()) != null) {
-                System.out.println(s);
+                return classPath.toString();
             }
+        };
+        classpath.add(Paths.get(launcherJarFile.getAbsolutePath()));
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        ExternalLaunchProfile profile = new ExternalLaunchProfile("fr.timeto.astrauworld.launcher.main.LauncherFrame", classpath.make());
+        ExternalLauncher launcher = new ExternalLauncher(profile);
+
+        Process process = launcher.launch();
+
+        splash.stop();
+
+        BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+        System.out.println();
+
+        String s;
+        while ((s = stdInput.readLine()) != null) {
+            System.out.println(s);
         }
 
         System.exit(0);
@@ -524,11 +533,13 @@ public class Bootstrap {
     public static void main(String[] args) {
         try {
             initFonts();
+            isException = false;
 
             if (OS.toLowerCase().contains("win")) {
                 println("Windows OK");
             } else if (OS.toLowerCase().contains("mac")) {
                 println("MacOS OK");
+                setTaskbarIcon(Swinger.getResourceIgnorePath("/icon.png"));
             } else if (OS.toLowerCase().contains("nix") || OS.toLowerCase().contains("nux") || OS.toLowerCase().contains("aix")) {
                 println("Unix OK");
             } else {
@@ -574,30 +585,40 @@ public class Bootstrap {
 
             splash.display();
 
-            update();
 
-            infosLabel.setText("Lancement...");
-            Thread t = new Thread(() -> {
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            t.start();
-            try {
-                t.join();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            if (!isException) {
+                update();
             }
 
-            launch();
+            infosLabel.setText("Lancement...");
+
+            if (!isException) {
+                launch();
+            }
         } catch (Exception e) {
+            isException = true;
+            if (e.getMessage().contains("Nouvelle version du bootstrap disponible")) {
+                Thread t = new Thread(() -> {
+                    try {
+                        Desktop.getDesktop().browse(URI.create("https://github.com/AstrauworldMC/bootstrap/releases"));
+                    } catch (IOException ignored) {}
+
+                    System.exit(0);
+                });
+                PopUpMessages.normalMessage("Nouvelle version", "Une nouvelle version du bootstrap (" + newSaver.get("bootstrapVersion") + ") estdisponible.", t);
+            } else {
+                Thread t = new Thread(() -> {
+                    System.exit(1);
+                });
+                try {
+                    String[] causeSplit1 = e.getCause().toString().split(":");
+                    String[] causeSplit2 = causeSplit1[0].split("\\.");
+                    PopUpMessages.errorMessage(causeSplit2[causeSplit2.length - 1], e.getLocalizedMessage(), t);
+                } catch (Exception ex) {
+                    PopUpMessages.errorMessage("Erreur (non reconnue)", e.getLocalizedMessage(), t);
+                }
+            }
             e.printStackTrace();
-            Thread t = new Thread(() -> {
-                System.exit(1);
-            });
-            PopUpMessages.errorMessage("Erreur", e.getLocalizedMessage(), t);
         }
 
     }
