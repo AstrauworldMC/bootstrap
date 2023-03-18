@@ -605,7 +605,7 @@ public class Bootstrap {
 
                     System.exit(0);
                 });
-                PopUpMessages.normalMessage("Nouvelle version", "Une nouvelle version du bootstrap (" + newSaver.get("bootstrapVersion") + ") estdisponible.", t);
+                PopUpMessages.normalMessage("Nouvelle version", "Une nouvelle version du bootstrap (" + newSaver.get("bootstrapVersion") + ") est disponible.", t);
             } else {
                 Thread t = new Thread(() -> {
                     System.exit(1);
