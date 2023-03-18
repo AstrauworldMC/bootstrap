@@ -613,9 +613,9 @@ public class Bootstrap {
                 try {
                     String[] causeSplit1 = e.getCause().toString().split(":");
                     String[] causeSplit2 = causeSplit1[0].split("\\.");
-                    PopUpMessages.errorMessage(causeSplit2[causeSplit2.length - 1], e.getLocalizedMessage(), t);
+                    PopUpMessages.errorMessage(causeSplit2[causeSplit2.length - 1], parseUnicode(e.getLocalizedMessage()), t);
                 } catch (Exception ex) {
-                    PopUpMessages.errorMessage("Erreur (non reconnue)", e.getLocalizedMessage(), t);
+                    PopUpMessages.errorMessage("Erreur (non reconnue)", parseUnicode(e.getLocalizedMessage()), t);
                 }
             }
             e.printStackTrace();
