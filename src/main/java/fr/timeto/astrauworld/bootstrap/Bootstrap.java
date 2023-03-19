@@ -36,7 +36,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 public class Bootstrap {
 
     static String OS = System.getProperty("os.name");
-    static final String version = "1.2.0"; // TODO Changer la version
+    static final String version = "1.2.1"; // TODO Changer la version
     static boolean isException = false;
 
     static SplashScreen splash = new SplashScreen("Astrauworld Launcher", Swinger.getResourceIgnorePath("/splash.png"));
