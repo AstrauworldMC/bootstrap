@@ -511,7 +511,7 @@ public class Bootstrap {
         };
         classpath.add(Paths.get(launcherJarFile.getAbsolutePath()));
 
-        ExternalLaunchProfile profile = new ExternalLaunchProfile("fr.timeto.astrauworld.launcher.main.LauncherFrame", classpath.make());
+        ExternalLaunchProfile profile = new ExternalLaunchProfile("fr.timeto.astrauworld.launcher.main.Main", classpath.make());
         ExternalLauncher launcher = new ExternalLauncher(profile);
 
         Process process = launcher.launch();
