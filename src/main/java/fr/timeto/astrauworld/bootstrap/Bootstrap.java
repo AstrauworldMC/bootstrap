@@ -1,18 +1,28 @@
 package fr.timeto.astrauworld.bootstrap;
 
+import fr.flowarg.flowio.FileUtils;
+import fr.flowarg.flowlogger.ILogger;
+import fr.flowarg.flowupdater.FlowUpdater;
+import fr.flowarg.flowupdater.download.DownloadList;
+import fr.flowarg.flowupdater.download.IProgressCallback;
+import fr.flowarg.flowupdater.download.Step;
+import fr.flowarg.flowupdater.download.json.ExternalFile;
 import fr.theshark34.openlauncherlib.JavaUtil;
 import fr.theshark34.openlauncherlib.external.ClasspathConstructor;
 import fr.theshark34.openlauncherlib.external.ExternalLaunchProfile;
 import fr.theshark34.openlauncherlib.external.ExternalLauncher;
 import fr.theshark34.openlauncherlib.util.Saver;
+import fr.theshark34.openlauncherlib.util.explorer.Explorer;
 import fr.theshark34.swinger.Swinger;
 import fr.theshark34.openlauncherlib.util.SplashScreen;
 import fr.theshark34.swinger.colored.SColoredBar;
 import fr.timeto.timutilslib.PopUpMessages;
+import fr.timeto.timutilslib.TimFilesUtils;
 import net.harawata.appdirs.AppDirsFactory;
 import org.codehaus.plexus.archiver.tar.TarGZipUnArchiver;
 import org.codehaus.plexus.archiver.zip.ZipUnArchiver;
 import org.codehaus.plexus.logging.console.ConsoleLoggerManager;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
@@ -21,8 +31,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.file.*;
+import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -36,7 +49,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 public class Bootstrap {
 
     static String OS = System.getProperty("os.name");
-    static final String version = "1.2.1"; // TODO Changer la version
+    static final String version = "1.2.2"; // TODO Changer la version
     static boolean isException = false;
 
     static SplashScreen splash = new SplashScreen("Astrauworld Launcher", Swinger.getResourceIgnorePath("/splash.png"));
@@ -50,6 +63,10 @@ public class Bootstrap {
     static String oldCurrentPropertiesDir = astrauworldDir + File.separator + "currentLauncher.properties";
     static String newPropertiesDir = astrauworldDir + separatorChar + "newLauncher.properties";
     static String launcherJar = astrauworldDir + separatorChar + "launcher.jar";
+    static String libsDir = astrauworldDir + separatorChar + "libs";
+
+    static String libsJsonURL = "https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/libs.json";
+    static String libsPlatformJsonURL = "https://raw.githubusercontent.com/AstrauworldMC/launcher/main/src/main/resources/libs";
 
     static File astrauworldFolder = new File(astrauworldDir);
     static File customJavaFolder = new File(customJavaDir);
@@ -60,6 +77,8 @@ public class Bootstrap {
 
     static Path currentPropertiesPath = Paths.get(currentPropertiesDir);
     static Path newPropertiesPath = Paths.get(newPropertiesDir);
+
+    static Path libsFolder = Paths.get(libsDir);
 
     static Saver currentSaver = new Saver(currentPropertiesPath);
     static Saver newSaver = new Saver(newPropertiesPath);
@@ -207,6 +226,97 @@ public class Bootstrap {
         }
     }
 
+    static void updateLibs() throws Exception {
+
+        IProgressCallback callback = new IProgressCallback() {
+            private final DecimalFormat decimalFormat = new DecimalFormat("#.#");
+
+            @Override
+            public void init(ILogger logger) {
+            }
+
+            @Override
+            public void step(Step step) {
+                infosLabel.setText("T\u00e9l\u00e9chargement des librairies");
+            }
+
+            public void onFileDownloaded(Path path) {
+            }
+
+            @Override
+            public void update(DownloadList.DownloadInfo info) {
+
+                long progressLong = info.getDownloadedBytes();
+                long maximumLong = info.getTotalToDownloadBytes();
+                long result;
+                try {
+                    result = (progressLong * 100) / maximumLong;
+                } catch (ArithmeticException e) {
+                    return;
+                }
+
+                int progress = (int) info.getDownloadedBytes();
+                int maximum = (int) info.getTotalToDownloadBytes();
+
+                percentLabel.setText(result + "%");
+                progressBar.setValue(progress);
+                progressBar.setMaximum(maximum);
+                bytesLabel.setText(TimFilesUtils.getBytesConverted(progressLong, true) + "/" + TimFilesUtils.getBytesConverted(maximumLong, true));
+            }
+        };
+
+        List<ExternalFile> libsExtFiles = ExternalFile.getExternalFilesFromJson(libsJsonURL);
+        List<ExternalFile> libsPlatformExtFiles = ExternalFile.getExternalFilesFromJson(libsPlatformJsonURL);
+
+        libsExtFiles.addAll(libsPlatformExtFiles);
+
+        FlowUpdater.FlowUpdaterBuilder updaterBuilder = new FlowUpdater.FlowUpdaterBuilder();
+
+        FlowUpdater updater = updaterBuilder
+                .withProgressCallback(callback)
+                .withExternalFiles(libsExtFiles)
+                .build();
+
+        bytesLabel.setVisible(true);
+        percentLabel.setVisible(true);
+        progressBar.setVisible(true);
+        updater.update(libsFolder);
+        bytesLabel.setVisible(false);
+        percentLabel.setVisible(false);
+        progressBar.setVisible(false);
+
+        new File(libsDir + separatorChar + "assets").delete();
+        new File(libsDir + separatorChar + "libraries").delete();
+        new File(libsDir + separatorChar + "natives").delete();
+
+        verifyLibs(libsExtFiles, libsFolder);
+
+    }
+
+    public static void verifyLibs(@NotNull List<ExternalFile> externalFiles, Path dir) throws Exception
+    {
+        if(externalFiles.isEmpty()) return;
+
+        Path[] paths = Explorer.dir(dir).files().get().toArray(new Path[0]);
+        ArrayList<String> sha1List = new ArrayList<>();
+        int i = 0;
+
+        while (i != externalFiles.size()) {
+            sha1List.add(externalFiles.get(i).getSha1());
+            i++;
+        }
+
+        i = 0;
+
+        while (i != paths.length) {
+            if (!sha1List.contains(FileUtils.getSHA1(paths[i]))) {
+                paths[i].toFile().delete();
+            }
+            i++;
+        }
+
+    }
+
     static void update() throws Exception {
         astrauworldFolder.mkdir();
 
@@ -223,6 +333,10 @@ public class Bootstrap {
 
         if (!isException) {
             customJavaFolder = getJava();
+        }
+
+        if (!isException) {
+            updateLibs();
         }
 
         if (!isException) {
@@ -510,6 +624,7 @@ public class Bootstrap {
             }
         };
         classpath.add(Paths.get(launcherJarFile.getAbsolutePath()));
+        classpath.add(Explorer.dir(libsFolder).files());
 
         ExternalLaunchProfile profile = new ExternalLaunchProfile("fr.timeto.astrauworld.launcher.main.Main", classpath.make());
         ExternalLauncher launcher = new ExternalLauncher(profile);
@@ -518,6 +633,7 @@ public class Bootstrap {
 
         splash.stop();
 
+        // Comment d'ici
         BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
         System.out.println();
@@ -526,22 +642,25 @@ public class Bootstrap {
         while ((s = stdInput.readLine()) != null) {
             System.out.println(s);
         }
+        // à là pour mac
 
         System.exit(0);
     }
 
     public static void main(String[] args) {
         try {
-            initFonts();
             isException = false;
 
             if (OS.toLowerCase().contains("win")) {
                 println("Windows OK");
+                libsPlatformJsonURL = libsPlatformJsonURL + "-win.json";
             } else if (OS.toLowerCase().contains("mac")) {
                 println("MacOS OK");
+                libsPlatformJsonURL = libsPlatformJsonURL + "-mac.json";
                 setTaskbarIcon(Swinger.getResourceIgnorePath("/icon.png"));
             } else if (OS.toLowerCase().contains("nix") || OS.toLowerCase().contains("nux") || OS.toLowerCase().contains("aix")) {
                 println("Unix OK");
+                libsPlatformJsonURL = libsPlatformJsonURL + "-linux.json";
             } else {
                 Thread ok = new Thread(() -> {
                     System.exit(1);
@@ -564,7 +683,7 @@ public class Bootstrap {
 
             infosLabel.setBounds(34, 372, 278, 20);
             infosLabel.setForeground(Color.WHITE);
-            infosLabel.setFont(kollektifBoldFont.deriveFont(16f));
+            infosLabel.setFont(robotoBoldFont.deriveFont(16f));
             splash.add(infosLabel);
 
             progressBar.setBounds(0, 431, 346, 15);
